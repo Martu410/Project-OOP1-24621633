@@ -1,4 +1,4 @@
-package automata;
+package automata.core;
 
 public class State {
     private String name;

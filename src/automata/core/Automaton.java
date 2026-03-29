@@ -1,5 +1,8 @@
 package automata;
 
+import automata.model.State;
+import automata.model.Transition;
+
 import java.util.ArrayList;
 import java.util.List;
 
