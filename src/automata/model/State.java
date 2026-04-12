@@ -1,4 +1,4 @@
-package automata.core;
+package automata.model;
 
 public class State {
     private String name;

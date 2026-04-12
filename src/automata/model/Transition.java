@@ -1,4 +1,4 @@
-package automata;
+package automata.model;
 
 public class Transition {
     private State from;
