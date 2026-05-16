@@ -1,7 +1,10 @@
 package automata;
 
+import automata.core.RegexParser;
 import automata.manager.AutomatonManager;
 import automata.core.Automaton;
+import automata.manager.FileHandler;
+
 import java.util.Scanner;
 
 // Главен клас, съдържащ входната точка на програмата и конзолното меню (REPL цикъл)
@@ -37,6 +40,26 @@ public class Main {
 
             // Изпълняваме различна логика в зависимост от въведената команда
             switch (command) {
+                case "save":
+                    // Проверяваме дали е подадено име на файл като втори аргумент
+                    if (parts.length < 2) {
+                        System.out.println("Грешка: Моля, въведете име на файл");
+                    } else {
+                        // Извикваме статичния метод save от FileHandler, подавайки мениджъра и името на файла
+                        FileHandler.save(manager, parts[1]);
+                    }
+                    break;
+
+                case "open":
+                    // Проверяваме дали е подадено име на файл за зареждане
+                    if (parts.length < 2) {
+                        System.out.println("Грешка: Моля, въведете име на файл");
+                    } else {
+                        // Извикваме статичния метод open от FileHandler, за да заредим данните в мениджъра
+                        FileHandler.open(manager, parts[1]);
+                    }
+                    break;
+
                 case "help":
                     // Извеждаме списък с всички налични команди и тяхното описание
                     System.out.println("Налични команди до момента:");
@@ -82,6 +105,23 @@ public class Main {
                             else System.out.println("Думата '" + word + "' НЕ СЕ разпознава.");
                         } else {
                             System.out.println("Автомат не е намерен.");
+                        }
+                    }
+                    break;
+
+                case "reg":
+                    // Проверяваме дали потребителят е въвел израз и ID
+                    if (parts.length < 3) {
+                        System.out.println("Грешка: Форматът е 'reg <regex> <id>' ");
+                    } else {
+                        try {
+                            // Извикваме парсера да сглоби автомата от регулярния израз
+                            Automaton a = RegexParser.createFromRegex(parts[1], parts[2]);
+                            manager.addAutomaton(a); // Записваме готовия автомат в мениджъра
+                            System.out.println("Успешно създаден автомат '" + parts[2] + "' от израза: " + parts[1]);
+                        } catch (Exception e) {
+                            // Ако изразът е грешен (напр. несъвпадащи скоби), хващаме грешката, за да не крашне програмата
+                            System.out.println("Грешка при парсване на израза. Проверете синтаксиса (скоби и оператори).");
                         }
                     }
                     break;
