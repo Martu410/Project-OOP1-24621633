@@ -67,6 +67,7 @@ public class Main {
                     System.out.println("  empty <id>               - Проверява дали езикът на автомата е празен");
                     System.out.println("  recognize <id> <word>    - Проверява дали дума се разпознава");
                     System.out.println("  exit                     - Изход от програмата");
+                    System.out.println("reg <regex> <id> - Създава автомат от регулярен израз");
                     break;
 
                 case "list":
