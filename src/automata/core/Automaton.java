@@ -33,7 +33,7 @@ public class Automaton implements Recognizable {
     public List<State> getStates() { return states; }
     public List<Transition> getTransitions() { return transitions; }
 
-    // Добавя състояние в списъка и му прави празно местенце в речника
+    // Добавя състояние в списъка и му прави празно място в речника
     public void addState(State state) {
         states.add(state);
         transitionMap.putIfAbsent(state, new ArrayList<>());
