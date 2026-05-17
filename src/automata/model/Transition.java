@@ -1,33 +1,32 @@
 package automata.model;
 
-// Клас, който описва преход между две състояния при прочитане на даден символ
+/**
+ * Клас за преход (стрелката) между две състояния.
+ * Направен е като Immutable (неизменяем) - веднъж създаден, не се пипа!
+ */
 public class Transition {
-    // Състоянието, от което тръгва преходът
-    private State from;
-    // Символът, който се прочита ('E' означава Епсилон/празна дума)
-    private char symbol;
-    // Състоянието, в което се отива след прочитане на символа
-    private State to;
+    // Използваме final, за да не може никой да промени откъде тръгва преходът
+    private final State from;
+    // Символът на прехода (буква или 'E' за празна дума)
+    private final char symbol;
+    // Накъде отива преходът
+    private final State to;
 
-    // Конструктор за инициализиране на прехода
+    // Конструктор за създаване на прехода
     public Transition(State from, char symbol, State to) {
-        this.from = from;     // Задаваме началното състояние
-        this.symbol = symbol; // Задаваме символа на прехода
-        this.to = to;         // Задаваме крайното състояние
+        this.from   = from;
+        this.symbol = symbol;
+        this.to     = to;
     }
 
-    // Връща началното състояние на прехода
-    public State getFrom() {
-        return from;
-    }
+    // Само гетъри (без сетъри, защото полетата са final)
+    public State getFrom() { return from; }
+    public char getSymbol() { return symbol; }
+    public State getTo() { return to; }
 
-    // Връща символа, с който се извършва преходът
-    public char getSymbol() {
-        return symbol;
-    }
-
-    // Връща състоянието, до което води преходът
-    public State getTo() {
-        return to;
+    // Красиво принтиране за конзолата (напр. "q0 --(a)--> q1")
+    @Override
+    public String toString() {
+        return from.getName() + " --(" + symbol + ")--> " + to.getName();
     }
 }

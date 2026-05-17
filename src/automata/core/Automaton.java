@@ -2,155 +2,148 @@ package automata.core;
 
 import automata.model.State;
 import automata.model.Transition;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
 
-// Основен клас, който представя крайния автомат и реализира логиката за разпознаване
+import java.util.*;
+
+
 public class Automaton implements Recognizable {
-    // Уникален идентификатор (име) на автомата
-    private String id;
-    // Референция към началното състояние на автомата
-    private State startState;
-    // Списък, съхраняващ всички състояния в автомата
-    private List<State> states;
-    // Списък, съхраняващ всички преходи в автомата
-    private List<Transition> transitions;
+    private String id; // Името на автомата (напр. "A1")
+    private State startState; // Началното състояние (старт)
 
-    // Конструктор, който създава празен автомат с дадено име
+    private List<State> states; // Списък с всички състояния
+    private List<Transition> transitions; // Списък с всички преходи (за да им пазим реда при запазване)
+
+    // (Map), който пази за всяко състояние какви изходящи преходи има.
+    // Правим го, за да търсим преходи веднага, вместо да въртим for цикъл през всички преходи всеки път.
+    private Map<State, List<Transition>> transitionMap;
+
+    // Конструктор
     public Automaton(String id) {
-        this.id = id; // Записваме ID-то
-        this.states = new ArrayList<>(); // Инициализираме празен списък със състояния
-        this.transitions = new ArrayList<>(); // Инициализираме празен списък с преходи
+        this.id            = id;
+        this.states        = new ArrayList<>();
+        this.transitions   = new ArrayList<>();
+        this.transitionMap = new HashMap<>(); // Инициализираме речника
     }
 
-    // Връща идентификатора на автомата
-    public String getId() {
-        return id;
-    }
+    // Базови гетъри и сетъри
+    public String getId() { return id; }
+    public void setId(String id) { this.id = id; }
+    public State getStartState() { return startState; }
+    public void setStartState(State startState) { this.startState = startState; }
+    public List<State> getStates() { return states; }
+    public List<Transition> getTransitions() { return transitions; }
 
-    // Променя идентификатора на автомата
-    public void setId(String id) {
-        this.id = id;
-    }
-
-    // Връща началното състояние
-    public State getStartState() {
-        return startState;
-    }
-
-    // Задава кое да бъде началното състояние
-    public void setStartState(State startState) {
-        this.startState = startState;
-    }
-
-    // Връща всички състояния
-    public List<State> getStates() {
-        return states;
-    }
-
-    // Връща всички преходи
-    public List<Transition> getTransitions() {
-        return transitions;
-    }
-
-    // Добавя ново състояние към списъка на автомата
+    // Добавя състояние в списъка и му прави празно местенце в речника
     public void addState(State state) {
-        states.add(state); // Добавя обекта в ArrayList
+        states.add(state);
+        transitionMap.putIfAbsent(state, new ArrayList<>());
     }
 
-    // Създава и добавя нов преход към автомата
+    // Добавя нов преход
     public void addTransition(State from, char symbol, State to) {
-        Transition newTransition = new Transition(from, symbol, to); // Инстанцираме нов преход
-        this.transitions.add(newTransition); // Добавяме го в колекцията
+        Transition t = new Transition(from, symbol, to);
+        transitions.add(t); // Слагаме го в общия списък
+        // Слагаме го и в бързия речник точно към състоянието "from"
+        transitionMap.computeIfAbsent(from, k -> new ArrayList<>()).add(t);
     }
 
-    // Намира Епсилон-затварянето за дадено множество от начални състояния
+    // Търси всички състояния, до които можем да стигнем САМО чрез епсилон преходи (без да четем буква)
     public Set<State> getEpsilonClosure(Set<State> initialStates) {
-        Set<State> closure = new HashSet<>(initialStates); // Създаваме множество и копираме началните състояния в него
-        for (State s : initialStates) { // Обхождаме всяко начално състояние
-            epsilonDFS(s, closure); // Извикваме рекурсивно търсене в дълбочина (DFS) за намиране на свързаните чрез Епсилон състояния
-        }
-        return closure; // Връщаме пълното множество от достижими състояния
-    }
+        Set<State> closure = new HashSet<>(initialStates); // Тук ще пазим резултата
+        Deque<State> stack = new ArrayDeque<>(initialStates); // Модерен стек за обхождане
 
-    // Помощен рекурсивен метод (DFS) за намиране на състояния, достижими чрез Епсилон преходи
-    private void epsilonDFS(State current, Set<State> closure) {
-        for (Transition t : transitions) { // Обхождаме всички налични преходи
-            // Ако преходът тръгва от текущото състояние и е с празна дума ('E')
-            if (t.getFrom().equals(current) && t.getSymbol() == 'E') {
-                // Опитваме се да добавим целевото състояние; add() връща true, ако състоянието е ново
-                if (closure.add(t.getTo())) {
-                    epsilonDFS(t.getTo(), closure); // Ако е ново, продължаваме рекурсията от него
+        // Докато има състояния в стека
+        while (!stack.isEmpty()) {
+            State current = stack.pop(); // Вадим най-горното
+            // Взимаме бързо от речника всички преходи за това състояние
+            for (Transition t : transitionMap.getOrDefault(current, new ArrayList<>())) {
+                // Ако преходът е епсилон ('E') и още не сме добавили състоянието
+                if (t.getSymbol() == 'E' && !closure.contains(t.getTo())) {
+                    closure.add(t.getTo()); // Добавяме го в резултата
+                    stack.push(t.getTo());  // Слагаме го в стека, за да го проверим и него после
                 }
             }
         }
+        return closure;
     }
 
-    // Проверява дали подадената дума се приема от автомата
+    // Проверява дали дадена дума се приема (НКА симулация)
     @Override
     public boolean recognize(String word) {
-        if (startState == null) return false; // Ако няма начално състояние, думата не може да бъде разпозната
+        if (startState == null) return false; // Ако нямаме старт, няма как да четем
 
-        Set<State> current = new HashSet<>(); // Създаваме множество за текущите активни състояния
-        current.add(startState); // Винаги започваме от началното състояние
-        current = getEpsilonClosure(current); // Правим Епсилон-затваряне преди да започнем четенето на букви
+        Set<State> current = new HashSet<>();
+        current.add(startState);
+        current = getEpsilonClosure(current); // Първо намираме къде можем да отидем (с 'E')
 
-        // Обхождаме думата буква по буква
+        // Минаваме през всяка буква от думата
         for (char symbol : word.toCharArray()) {
-            Set<State> next = new HashSet<>(); // Създаваме множество за състоянията, в които ще попаднем
-            for (State state : current) { // За всяко едно от текущите състояния
-                for (Transition t : transitions) { // Проверяваме всички възможни преходи
-                    // Ако преходът тръгва от текущото състояние и е с текущата буква от думата
-                    if (t.getFrom().equals(state) && t.getSymbol() == symbol) {
-                        next.add(t.getTo()); // Добавяме целевото състояние в множеството за следващата стъпка
-                    }
+            Set<State> next = new HashSet<>();
+            // За всяко състояние, в което се намираме в момента
+            for (State state : current) {
+                // Проверяваме къде можем да отидем с текущата буква
+                for (Transition t : transitionMap.getOrDefault(state, new ArrayList<>())) {
+                    if (t.getSymbol() == symbol) next.add(t.getTo());
                 }
             }
-            current = getEpsilonClosure(next); // Правим Епсилон-затваряне на новите състояния след прочитане на буквата
+            // След като прочетем буквата, пак правим епсилон-затваряне
+            current = getEpsilonClosure(next);
         }
 
-        // След като прочетем цялата дума, обхождаме финалния списък с достигнати състояния
+        // Накрая проверяваме дали поне едно от състоянията, до които сме стигнали, е финално
         for (State state : current) {
-            if (state.isAccepting()) return true; // Ако поне едно от тях е финално, думата е приета
+            if (state.isAccepting()) return true;
         }
-        return false; // Думата не води до финално състояние
+        return false;
     }
 
-    // Проверява дали езикът на автомата е празен (т.е. дали съществува път от началното до някое финално състояние)
-    @Override
-    public boolean isEmpty() {
-        // Ако няма начално състояние, няма как да стигнем до финално -> езикът със сигурност е празен
-        if (startState == null) return true;
+    // Отпечатва всички преходи на автомата
+    public void printInfo() {
+        System.out.println("Автомат: " + id);
+        if (transitions.isEmpty()) {
+            System.out.println("  (няма преходи)");
+        } else {
+            for (Transition t : transitions) System.out.println("  " + t);
+        }
+    }
 
-        // Множество за съхранение на вече посетените състояния, за да предотвратим безкрайни цикли при наличие на затворени пътища
-        Set<State> visited = new HashSet<>();
-        // Използваме структурата Стек (Stack) за реализация на алгоритъма "Търсене в дълбочина" (DFS)
-        java.util.Stack<State> stack = new java.util.Stack<>();
-        stack.push(startState); // Започваме обхождането от началното състояние
-
-        // Въртим цикъла, докато има непосетени достижими състояния
-        while (!stack.isEmpty()) {
-            State current = stack.pop(); // Взимаме поредното състояние от стека
-
-            // Ако намерим поне едно финално състояние, значи има поне една валидна дума -> езикът НЕ Е празен
-            if (current.isAccepting()) return false;
-
-            // Ако все още не сме проверявали това състояние
-            if (!visited.contains(current)) {
-                visited.add(current); // Маркираме го като проверено
-
-                // Обхождаме всички налични преходи в автомата
-                for (Transition t : transitions) {
-                    // Ако преходът тръгва от нашето текущо състояние
-                    if (t.getFrom().equals(current)) {
-                        stack.push(t.getTo()); // Добавяме целевото състояние в стека, за да го проверим на следващите стъпки
-                    }
-                }
+    // Проверява дали е автоматът е ДКА  (Детерминиран)
+    public boolean isDeterministic() {
+        for (State state : states) {
+            Set<Character> seen = new HashSet<>(); // Тук пазим буквите, които вече сме видели за това състояние
+            for (Transition t : transitionMap.getOrDefault(state, new ArrayList<>())) {
+                if (t.getSymbol() == 'E') return false; // ДКА няма епсилон преходи!
+                if (!seen.add(t.getSymbol())) return false; // Ако буквата се повтаря от едно състояние -> не е ДКА
             }
         }
-        // Ако сме обходили целия граф от достижими състояния и никое от тях не е финално -> езикът е празен
+        return true;
+    }
+
+    // Проверява дали езикът е празен
+    @Override
+    public boolean isEmpty() {
+        if (startState == null) return true;
+
+        Set<State> visited = new HashSet<>(); // Пазим къде сме били
+        Deque<State> stack = new ArrayDeque<>(); // Модерен стек за DFS обхождане
+        stack.push(startState);
+
+        while (!stack.isEmpty()) {
+            State current = stack.pop();
+
+            // Проверяваме дали вече сме го посетили
+            if (visited.contains(current)) continue;
+            visited.add(current); // Отбелязваме го като посетено
+
+            // Ако намерим финално състояние, езикът не е празен
+            if (current.isAccepting()) return false;
+
+            // Добавяме всички съседи в стека
+            for (Transition t : transitionMap.getOrDefault(current, new ArrayList<>())) {
+                stack.push(t.getTo());
+            }
+        }
+        // Ако сме обиколили всичко и не сме намерили финално състояние -> празен е
         return true;
     }
 }
