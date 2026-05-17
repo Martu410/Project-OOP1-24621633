@@ -5,7 +5,6 @@ import automata.model.State;
 import automata.model.Transition;
 
 import java.io.*;
-import java.util.Map;
 
 // Клас, отговарящ за сериализацията (записването) и десериализацията (четенето) на автомати във/от файл
 public class FileHandler {

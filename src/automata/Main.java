@@ -1,138 +1,174 @@
 package automata;
 
+import automata.core.Automaton;
+import automata.core.AutomatonException;
+import automata.core.AutomatonOperations;
 import automata.core.RegexParser;
 import automata.manager.AutomatonManager;
-import automata.core.Automaton;
-import automata.manager.FileHandler;
+import automata.manager.FileHandler; // ВАЖНО: Добавихме импорта за работа с файлове
 
 import java.util.Scanner;
 
-// Главен клас, съдържащ входната точка на програмата и конзолното меню (REPL цикъл)
 public class Main {
+
     public static void main(String[] args) {
-        // Създаваме обект Scanner за четене на вход от потребителя чрез конзолата (System.in)
         Scanner scanner = new Scanner(System.in);
-        // Създаваме инстанция на мениджъра, който ще съхранява създадените автомати по време на сесията
-        AutomatonManager manager = new AutomatonManager();
+        AutomatonManager manager = new AutomatonManager(); // Създаваме си мениджъра за паметта
+        boolean isRunning = true; // Флаг за цикъла
 
-        // Отпечатваме приветствени съобщения при стартиране на програмата
-        System.out.println("=== Система за Крайни Автомати ===");
-        System.out.println("Въведете команда (или 'help' за списък, 'exit' за изход):");
+        System.out.println("=== Система за Крайни Автомати (НКА/ДКА) ===");
+        System.out.println("Напишете 'help' за списък с команди.");
 
-        // Безкраен цикъл за интерактивно въвеждане на команди
-        while (true) {
-            System.out.print("> "); // Индикатор за чакащо въвеждане от потребителя
-            String input = scanner.nextLine().trim(); // Четем целия ред и премахваме излишните интервали в началото и края
+        // Безкраен цикъл, докато не напишем "exit"
+        while (isRunning) {
+            System.out.print("\n> ");
+            String input = scanner.nextLine().trim();
+            if (input.isEmpty()) continue; // Ако ударим само Enter, нищо не правим
 
-            // Проверка дали потребителят е въвел команда за изход
-            if (input.equalsIgnoreCase("exit")) {
-                System.out.println("Излизане от програмата...");
-                break; // Прекъсваме безкрайния цикъл, което води до край на програмата
-            }
-
-            // Ако потребителят е натиснал само Enter (празен низ), пропускаме тази итерация на цикъла
-            if (input.isEmpty()) continue;
-
-            // Разделяме входа на масив от думи, използвайки един или повече интервали като разделител
+            // Разделяме входа по интервали. parts[0] е командата, parts[1] е първият аргумент и т.н.
             String[] parts = input.split("\\s+");
-            // Извличаме първата дума, която представлява самата команда, и я правим с малки букви
             String command = parts[0].toLowerCase();
 
-            // Изпълняваме различна логика в зависимост от въведената команда
-            switch (command) {
-                case "save":
-                    // Проверяваме дали е подадено име на файл като втори аргумент
-                    if (parts.length < 2) {
-                        System.out.println("Грешка: Моля, въведете име на файл");
-                    } else {
-                        // Извикваме статичния метод save от FileHandler, подавайки мениджъра и името на файла
+            // Слагаме всичко в try-catch, за да хващаме грешките (напр. ако търсим липсващ автомат)
+            try {
+                switch (command) {
+                    case "help":
+                        System.out.println("Налични команди:");
+                        System.out.println("  list                     - Списък на всички автомати");
+                        System.out.println("  print <id>               - Извежда всички преходи на автомата");
+                        System.out.println("  reg <regex> <id>         - Създава автомат от регулярен израз");
+                        System.out.println("  recognize <id> <word>    - Проверява дали дума се разпознава");
+                        System.out.println("  empty <id>               - Проверява дали езикът е празен");
+                        System.out.println("  deterministic <id>       - Проверява дали автоматът е ДКА");
+                        System.out.println("  finite <id>              - Проверява дали езикът е краен");
+                        System.out.println("  union <id1> <id2> <new>  - Обединение на два автомата");
+                        System.out.println("  concat <id1> <id2> <new> - Конкатенация на два автомата");
+                        System.out.println("  kleene <id> <new>        - Звезда на Клини (повторение)");
+                        System.out.println("  un <id> <new>            - Позитивна обвивка (Kleene Plus)");
+                        System.out.println("  determinize <id> <new>   - Превръща НКА в ДКА");
+                        System.out.println("  save <filename>          - Запазва автоматите във файл");
+                        System.out.println("  open <filename>          - Зарежда автомати от файл");
+                        System.out.println("  exit                     - Изход от програмата");
+                        break;
+
+                    case "list":
+                        if (manager.getAllAutomata().isEmpty()) {
+                            System.out.println("Няма заредени автомати.");
+                        } else {
+                            System.out.println("Заредени автомати:");
+                            for (String key : manager.getAllAutomata().keySet()) System.out.println(" - " + key);
+                        }
+                        break;
+
+                    case "print":
+                        if (parts.length < 2) throw new AutomatonException("Формат: print <id>");
+                        Automaton autPrint = getRequired(manager, parts[1]);
+                        autPrint.printInfo();
+                        break;
+
+                    case "reg":
+                        if (parts.length < 3) throw new AutomatonException("Формат: reg <regex> <id>");
+                        Automaton regAut = RegexParser.createFromRegex(parts[1], parts[2]);
+                        manager.addAutomaton(regAut);
+                        System.out.println("Създаден автомат: " + parts[2]);
+                        break;
+
+                    case "recognize":
+                        if (parts.length < 3) throw new AutomatonException("Формат: recognize <id> <word>");
+                        String word = parts[2].equals("\"\"") ? "" : parts[2];
+                        Automaton autRec = getRequired(manager, parts[1]);
+                        boolean accepted = autRec.recognize(word);
+                        System.out.println("Думата " + (accepted ? "СЕ РАЗПОЗНАВА" : "НЕ СЕ РАЗПОЗНАВА"));
+                        break;
+
+                    case "empty":
+                        if (parts.length < 2) throw new AutomatonException("Формат: empty <id>");
+                        Automaton autEmpty = getRequired(manager, parts[1]);
+                        System.out.println("Езикът на автомата " + (autEmpty.isEmpty() ? "Е празен." : "НЕ Е празен."));
+                        break;
+
+                    case "deterministic":
+                        if (parts.length < 2) throw new AutomatonException("Формат: deterministic <id>");
+                        Automaton autDet = getRequired(manager, parts[1]);
+                        System.out.println("Автоматът " + (autDet.isDeterministic() ? "Е детерминиран (ДКА)." : "Е недетерминиран (НКА)."));
+                        break;
+
+                    case "finite":
+                        if (parts.length < 2) throw new AutomatonException("Формат: finite <id>");
+                        Automaton autFin = getRequired(manager, parts[1]);
+                        System.out.println("Езикът на автомата е " + (autFin.isFinite() ? "КРАЕН." : "БЕЗКРАЕН."));
+                        break;
+
+                    case "union":
+                        if (parts.length < 4) throw new AutomatonException("Формат: union <id1> <id2> <new_id>");
+                        Automaton u1 = getRequired(manager, parts[1]);
+                        Automaton u2 = getRequired(manager, parts[2]);
+                        manager.addAutomaton(AutomatonOperations.union(u1, u2, parts[3]));
+                        System.out.println("Обединен автомат: " + parts[3]);
+                        break;
+
+                    case "concat":
+                        if (parts.length < 4) throw new AutomatonException("Формат: concat <id1> <id2> <new_id>");
+                        Automaton c1 = getRequired(manager, parts[1]);
+                        Automaton c2 = getRequired(manager, parts[2]);
+                        manager.addAutomaton(AutomatonOperations.concat(c1, c2, parts[3]));
+                        System.out.println("Конкатениран автомат: " + parts[3]);
+                        break;
+
+                    case "kleene":
+                        if (parts.length < 3) throw new AutomatonException("Формат: kleene <id> <new_id>");
+                        Automaton k1 = getRequired(manager, parts[1]);
+                        manager.addAutomaton(AutomatonOperations.kleene(k1, parts[2]));
+                        System.out.println("Звезда на Клини приложена: " + parts[2]);
+                        break;
+
+                    case "un":
+                        if (parts.length < 3) throw new AutomatonException("Формат: un <id> <new_id>");
+                        Automaton un1 = getRequired(manager, parts[1]);
+                        manager.addAutomaton(AutomatonOperations.positiveKleene(un1, parts[2]));
+                        System.out.println("Позитивна обвивка (un) приложена: " + parts[2]);
+                        break;
+
+                    case "determinize":
+                        if (parts.length < 3) throw new AutomatonException("Формат: determinize <id> <new_id>");
+                        Automaton d1 = getRequired(manager, parts[1]);
+                        manager.addAutomaton(AutomatonOperations.determinize(d1, parts[2]));
+                        System.out.println("Автоматът е конвертиран в ДКА: " + parts[2]);
+                        break;
+
+                    case "save":
+                        if (parts.length < 2) throw new AutomatonException("Формат: save <filename>");
                         FileHandler.save(manager, parts[1]);
-                    }
-                    break;
+                        break;
 
-                case "open":
-                    // Проверяваме дали е подадено име на файл за зареждане
-                    if (parts.length < 2) {
-                        System.out.println("Грешка: Моля, въведете име на файл");
-                    } else {
-                        // Извикваме статичния метод open от FileHandler, за да заредим данните в мениджъра
+                    case "open":
+                        if (parts.length < 2) throw new AutomatonException("Формат: open <filename>");
                         FileHandler.open(manager, parts[1]);
-                    }
-                    break;
+                        break;
 
-                case "help":
-                    // Извеждаме списък с всички налични команди и тяхното описание
-                    System.out.println("Налични команди до момента:");
-                    System.out.println("  list                     - Показва всички заредени автомати");
-                    System.out.println("  empty <id>               - Проверява дали езикът на автомата е празен");
-                    System.out.println("  recognize <id> <word>    - Проверява дали дума се разпознава");
-                    System.out.println("  exit                     - Изход от програмата");
-                    System.out.println("reg <regex> <id> - Създава автомат от регулярен израз");
-                    break;
+                    case "exit":
+                        System.out.println("Изход...");
+                        isRunning = false;
+                        break;
 
-                case "list":
-                    // Извикваме метода от мениджъра за отпечатване на списъка с автомати
-                    manager.listAutomata();
-                    break;
-
-                case "empty":
-                    // Проверяваме дали потребителят е подал необходимия аргумент (ID на автомат)
-                    if (parts.length < 2) {
-                        System.out.println("Грешка: Моля, въведете ID.");
-                    } else {
-                        // Извличаме автомата от мениджъра по даденото ID
-                        Automaton a = manager.getAutomaton(parts[1]);
-                        if (a != null) { // Проверяваме дали автоматът реално съществува в паметта
-                            // Извикваме метода isEmpty() и отпечатваме съответния резултат
-                            if (a.isEmpty()) System.out.println("Езикът на автомата е ПРАЗЕН.");
-                            else System.out.println("Езикът на автомата НЕ Е празен.");
-                        } else {
-                            System.out.println("Автомат не е намерен.");
-                        }
-                    }
-                    break;
-
-                case "recognize":
-                    // Проверяваме дали има достатъчно аргументи (команда, ID, дума за разпознаване)
-                    if (parts.length < 3) {
-                        System.out.println("Грешка: Форматът е 'recognize <id> <word>'");
-                    } else {
-                        // Намираме автомата в мениджъра
-                        Automaton a = manager.getAutomaton(parts[1]);
-                        if (a != null) {
-                            String word = parts[2]; // Извличаме целевата дума от входа
-                            // Извикваме метода recognize() за да проверим думата
-                            if (a.recognize(word)) System.out.println("Думата '" + word + "' се РАЗПОЗНАВА.");
-                            else System.out.println("Думата '" + word + "' НЕ СЕ разпознава.");
-                        } else {
-                            System.out.println("Автомат не е намерен.");
-                        }
-                    }
-                    break;
-
-                case "reg":
-                    // Проверяваме дали потребителят е въвел израз и ID
-                    if (parts.length < 3) {
-                        System.out.println("Грешка: Форматът е 'reg <regex> <id>' ");
-                    } else {
-                        try {
-                            // Извикваме парсера да сглоби автомата от регулярния израз
-                            Automaton a = RegexParser.createFromRegex(parts[1], parts[2]);
-                            manager.addAutomaton(a); // Записваме готовия автомат в мениджъра
-                            System.out.println("Успешно създаден автомат '" + parts[2] + "' от израза: " + parts[1]);
-                        } catch (Exception e) {
-                            // Ако изразът е грешен (напр. несъвпадащи скоби), хващаме грешката, за да не крашне програмата
-                            System.out.println("Грешка при парсване на израза. Проверете синтаксиса (скоби и оператори).");
-                        }
-                    }
-                    break;
-
-                default:
-                    // Съобщение при въвеждане на невалидна команда
-                    System.out.println("Непозната команда. Напишете 'help'.");
+                    default:
+                        System.out.println("Непозната команда. Напишете 'help'.");
+                        break;
+                }
+            } catch (AutomatonException e) {
+                System.out.println("Грешка: " + e.getMessage());
+            } catch (Exception e) {
+                System.out.println("Неочаквана грешка: " + e.getMessage());
             }
         }
-        // Затваряме скенера, за да освободим системните ресурси след края на програмата
         scanner.close();
+    }
+
+    private static Automaton getRequired(AutomatonManager manager, String id) throws AutomatonException {
+        Automaton a = manager.getAutomaton(id);
+        if (a == null) {
+            throw new AutomatonException("Автомат '" + id + "' не съществува в паметта.");
+        }
+        return a;
     }
 }

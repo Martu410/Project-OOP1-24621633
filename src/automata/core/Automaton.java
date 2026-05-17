@@ -146,4 +146,77 @@ public class Automaton implements Recognizable {
         // Ако сме обиколили всичко и не сме намерили финално състояние -> празен е
         return true;
     }
+    // Проверява дали езикът е краен (търси за цикли в графа)
+    // Проверява дали езикът е краен или безкраен.
+    // Езикът е безкраен, ако в автомата има ЦИКЪЛ, но не какъв да е цикъл,
+    // а такъв, от който можеш да стигнеш до финално състояние!
+    public boolean isFinite() {
+        if (startState == null) return true; // Ако няма старт, езикът е празен (следователно е краен)
+
+        // СТЪПКА 1: Намираме всички "достижими" състояния (до които можем да стигнем от старта)
+        Set<State> reachable = new HashSet<>();
+        Deque<State> queue = new ArrayDeque<>();
+        queue.add(startState);
+        while (!queue.isEmpty()) {
+            State s = queue.poll();
+            if (reachable.add(s)) { // Ако успешно го добавим (т.е. не сме го виждали)
+                // Добавяме всичките му съседи в опашката
+                for (Transition t : transitionMap.getOrDefault(s, new ArrayList<>())) queue.add(t.getTo());
+            }
+        }
+
+        // СТЪПКА 2: Намираме всички "ко-достижими" състояния (от които може да се стигне до ФИНАЛ)
+        // За целта обръщаме посоката на стрелките (преходите)
+        Map<State, List<State>> reverse = new HashMap<>();
+        for (State s : reachable) reverse.put(s, new ArrayList<>());
+        for (State s : reachable) {
+            for (Transition t : transitionMap.getOrDefault(s, new ArrayList<>())) {
+                if (reachable.contains(t.getTo())) reverse.get(t.getTo()).add(s); // Записваме ги наобратно
+            }
+        }
+
+        Set<State> coReachable = new HashSet<>();
+        // Започваме търсенето наобратно, стартирайки от всички финални състояния
+        for (State s : reachable) if (s.isAccepting()) queue.add(s);
+        while (!queue.isEmpty()) {
+            State s = queue.poll();
+            if (coReachable.add(s)) {
+                for (State pred : reverse.getOrDefault(s, new ArrayList<>())) queue.add(pred);
+            }
+        }
+
+        // СТЪПКА 3: Полезни състояния = хем са достижими от старта, хем стигат до финала
+        Set<State> useful = new HashSet<>(reachable);
+        useful.retainAll(coReachable); // Оставяме само тези, които се засичат в двете множества
+
+        // СТЪПКА 4: Търсим цикъл само сред ПОЛЕЗНИТЕ състояния (Топологично сортиране / Kahn's Algorithm)
+        Map<State, Integer> inDegree = new HashMap<>(); // Пази колко стрелки ВЛИЗАТ във всяко състояние
+        for (State s : useful) inDegree.put(s, 0);
+        for (State s : useful) {
+            for (Transition t : transitionMap.getOrDefault(s, new ArrayList<>())) {
+                if (useful.contains(t.getTo())) inDegree.merge(t.getTo(), 1, Integer::sum); // Увеличаваме брояча
+            }
+        }
+
+        Deque<State> topoQueue = new ArrayDeque<>();
+        // Почваме от тези, в които не влизат никакви стрелки
+        for (State s : useful) if (inDegree.get(s) == 0) topoQueue.add(s);
+
+        int processed = 0; // Броим колко състояния сме обработили
+        while (!topoQueue.isEmpty()) {
+            State s = topoQueue.poll();
+            processed++;
+            // "Изтриваме" изходящите стрелки на това състояние
+            for (Transition t : transitionMap.getOrDefault(s, new ArrayList<>())) {
+                if (useful.contains(t.getTo())) {
+                    // Ако след изтриването в следващото състояние вече не влизат стрелки - го добавяме в опашката
+                    if (inDegree.merge(t.getTo(), -1, Integer::sum) == 0) topoQueue.add(t.getTo());
+                }
+            }
+        }
+
+        // Ако сме успели да обработим всички полезни състояния, значи НЯМА цикли -> езикът е КРАЕН (true).
+        // Ако processed е по-малко, значи сме забили в цикъл -> езикът е БЕЗКРАЕН (false).
+        return processed == useful.size();
+    }
 }
