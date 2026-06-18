@@ -1,73 +1,199 @@
 package automata.core;
 
+import automata.core.analysis.DeterminismCheck;
+import automata.core.analysis.EmptinessCheck;
+import automata.core.analysis.FinitenessCheck;
 import automata.model.State;
 import automata.model.Transition;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
-
+/**
+ * Представя краен автомат (детерминиран или недетерминиран с епсилон-преходи).
+ *
+ * <p>Класът реализира {@link Recognizable} и осигурява пълната логика за
+ * симулация и анализ на автомата: разпознаване на думи, проверка за празен
+ * и краен език, проверка за детерминираност и изчисляване на епсилон-затваряния.</p>
+ *
+ * <p>За производителност преходите се пазят едновременно в списък (за
+ * запазване на реда при сериализация) и в речник {@code transitionMap},
+ * който осигурява достъп за константно време O(1) до изходящите преходи на
+ * всяко състояние.</p>
+ */
 public class Automaton implements Recognizable {
-    private String id; // Името на автомата (напр. "A1")
-    private State startState; // Началното състояние (старт)
 
-    private List<State> states; // Списък с всички състояния
-    private List<Transition> transitions; // Списък с всички преходи (за да им пазим реда при запазване)
+    /** Уникалното име (идентификатор) на автомата, например "A1". */
+    private String id;
 
-    // (Map), който пази за всяко състояние какви изходящи преходи има.
-    // Правим го, за да търсим преходи веднага, вместо да въртим for цикъл през всички преходи всеки път.
+    /** Началното (стартово) състояние на автомата. */
+    private State startState;
+
+    /** Списък с всички състояния на автомата. */
+    private List<State> states;
+
+    /** Списък с всички преходи — пази реда им за нуждите на сериализацията. */
+    private List<Transition> transitions;
+
+    /**
+     * Речник, който за всяко състояние пази неговите изходящи преходи.
+     * Осигурява търсене за константно време O(1) вместо линейно обхождане.
+     */
     private Map<State, List<Transition>> transitionMap;
 
-    // Конструктор
+    /**
+     * Създава нов празен автомат със зададено име.
+     *
+     * @param id уникалният идентификатор на автомата
+     */
     public Automaton(String id) {
         this.id            = id;
         this.states        = new ArrayList<>();
         this.transitions   = new ArrayList<>();
-        this.transitionMap = new HashMap<>(); // Инициализираме речника
+        this.transitionMap = new HashMap<>();
     }
 
-    // Базови гетъри и сетъри
+    /**
+     * Връща идентификатора на автомата.
+     *
+     * @return името на автомата
+     */
     public String getId() { return id; }
+
+    /**
+     * Задава нов идентификатор на автомата.
+     *
+     * @param id новият идентификатор
+     */
     public void setId(String id) { this.id = id; }
+
+    /**
+     * Връща началното състояние на автомата.
+     *
+     * @return стартовото състояние или {@code null}, ако не е зададено
+     */
     public State getStartState() { return startState; }
+
+    /**
+     * Задава началното състояние на автомата.
+     *
+     * @param startState новото стартово състояние
+     */
     public void setStartState(State startState) { this.startState = startState; }
+
+    /**
+     * Връща списъка с всички състояния на автомата.
+     *
+     * @return списък със състоянията
+     */
     public List<State> getStates() { return states; }
+
+    /**
+     * Връща списъка с всички преходи на автомата.
+     *
+     * @return списък с преходите
+     */
     public List<Transition> getTransitions() { return transitions; }
 
-    // Добавя състояние в списъка и му прави празно място в речника
+    /**
+     * Връща списъка с изходящите преходи на дадено състояние.
+     * Ако състоянието няма записани преходи, връща празен списък.
+     *
+     * <p>Методът е публичен, за да могат класовете за анализ от пакета
+     * {@code automata.core.analysis} да ползват бързия достъп O(1) до
+     * преходите, без да им се разкрива вътрешният речник.</p>
+     *
+     * @param state състоянието, чиито преходи търсим
+     * @return списък с изходящите преходи
+     */
+    public List<Transition> getTransitionsFrom(State state) {
+        List<Transition> list = transitionMap.get(state);
+        if (list == null) {
+            return new ArrayList<>();
+        }
+        return list;
+    }
+
+    /**
+     * Добавя ново състояние към автомата и създава празен запис за него в
+     * речника с преходите.
+     *
+     * @param state състоянието за добавяне
+     */
     public void addState(State state) {
         states.add(state);
-        transitionMap.putIfAbsent(state, new ArrayList<>());
+        if (!transitionMap.containsKey(state)) {
+            transitionMap.put(state, new ArrayList<>());
+        }
     }
 
-    // Добавя нов преход
+    /**
+     * Създава и добавя нов преход към автомата.
+     *
+     * <p>Преходът се добавя както в общия списък (за запазване на реда), така
+     * и в речника {@code transitionMap} (за бърз достъп).</p>
+     *
+     * @param from   изходното състояние
+     * @param symbol символът на прехода ('E' за епсилон)
+     * @param to     целевото състояние
+     */
     public void addTransition(State from, char symbol, State to) {
         Transition t = new Transition(from, symbol, to);
-        transitions.add(t); // Слагаме го в общия списък
-        // Слагаме го и в бързия речник точно към състоянието "from"
-        transitionMap.computeIfAbsent(from, k -> new ArrayList<>()).add(t);
+        transitions.add(t);
+        List<Transition> list = transitionMap.get(from);
+        if (list == null) {
+            list = new ArrayList<>();
+            transitionMap.put(from, list);
+        }
+        list.add(t);
     }
 
-    // Търси всички състояния, до които можем да стигнем САМО чрез епсилон преходи (без да четем буква)
+    /**
+     * Изчислява епсилон-затварянето на дадено множество от състояния.
+     *
+     * <p>Епсилон-затварянето включва всички състояния, достижими от началното
+     * множество единствено чрез епсилон-преходи (без четене на символ).
+     * Реализацията е итеративно обхождане в дълбочина (DFS), което използва
+     * списък като стек и така избягва риска от препълване на стека при дълги
+     * вериги от епсилон-преходи.</p>
+     *
+     * @param initialStates началното множество от състояния
+     * @return множеството от всички епсилон-достижими състояния
+     */
     public Set<State> getEpsilonClosure(Set<State> initialStates) {
-        Set<State> closure = new HashSet<>(initialStates); // Тук ще пазим резултата
-        Deque<State> stack = new ArrayDeque<>(initialStates); // Модерен стек за обхождане
+        Set<State> closure = new HashSet<>(initialStates); // Тук пазим резултата
+        List<State> stack = new ArrayList<>(initialStates); // Списък, който ползваме като стек
 
         // Докато има състояния в стека
         while (!stack.isEmpty()) {
-            State current = stack.pop(); // Вадим най-горното
-            // Взимаме бързо от речника всички преходи за това състояние
-            for (Transition t : transitionMap.getOrDefault(current, new ArrayList<>())) {
+            State current = stack.remove(stack.size() - 1); // Вадим последния елемент (върха на стека)
+            // Обхождаме всички преходи за това състояние
+            for (Transition t : getTransitionsFrom(current)) {
                 // Ако преходът е епсилон ('E') и още не сме добавили състоянието
                 if (t.getSymbol() == 'E' && !closure.contains(t.getTo())) {
                     closure.add(t.getTo()); // Добавяме го в резултата
-                    stack.push(t.getTo());  // Слагаме го в стека, за да го проверим и него после
+                    stack.add(t.getTo());   // Слагаме го в стека, за да го проверим и него после
                 }
             }
         }
         return closure;
     }
 
-    // Проверява дали дадена дума се приема (НКА симулация)
+    /**
+     * Проверява дали дадена дума се разпознава (приема) от автомата.
+     *
+     * <p>Реализира симулация на НКА чрез проследяване на множество от текущи
+     * активни състояния. След всеки прочетен символ се изчислява новото
+     * епсилон-затваряне. Думата се приема, ако поне едно от крайните активни
+     * състояния е финално.</p>
+     *
+     * @param word думата за проверка
+     * @return {@code true}, ако думата принадлежи на езика на автомата
+     */
     @Override
     public boolean recognize(String word) {
         if (startState == null) return false; // Ако нямаме старт, няма как да четем
@@ -82,7 +208,7 @@ public class Automaton implements Recognizable {
             // За всяко състояние, в което се намираме в момента
             for (State state : current) {
                 // Проверяваме къде можем да отидем с текущата буква
-                for (Transition t : transitionMap.getOrDefault(state, new ArrayList<>())) {
+                for (Transition t : getTransitionsFrom(state)) {
                     if (t.getSymbol() == symbol) next.add(t.getTo());
                 }
             }
@@ -97,7 +223,9 @@ public class Automaton implements Recognizable {
         return false;
     }
 
-    // Отпечатва всички преходи на автомата
+    /**
+     * Отпечатва на конзолата подробна информация за всички преходи на автомата.
+     */
     public void printInfo() {
         System.out.println("Автомат: " + id);
         if (transitions.isEmpty()) {
@@ -107,116 +235,37 @@ public class Automaton implements Recognizable {
         }
     }
 
-    // Проверява дали е автоматът е ДКА  (Детерминиран)
+    /**
+     * Проверява дали автоматът е детерминиран (ДКА).
+     *
+     * <p>Делегира към класа {@link automata.core.analysis.DeterminismCheck}.</p>
+     *
+     * @return {@code true}, ако автоматът е детерминиран
+     */
     public boolean isDeterministic() {
-        for (State state : states) {
-            Set<Character> seen = new HashSet<>(); // Тук пазим буквите, които вече сме видели за това състояние
-            for (Transition t : transitionMap.getOrDefault(state, new ArrayList<>())) {
-                if (t.getSymbol() == 'E') return false; // ДКА няма епсилон преходи!
-                if (!seen.add(t.getSymbol())) return false; // Ако буквата се повтаря от едно състояние -> не е ДКА
-            }
-        }
-        return true;
+        return new DeterminismCheck().check(this);
     }
 
-    // Проверява дали езикът е празен
+    /**
+     * Проверява дали езикът на автомата е празен.
+     *
+     * <p>Делегира към класа {@link automata.core.analysis.EmptinessCheck}.</p>
+     *
+     * @return {@code true}, ако автоматът не приема нито една дума
+     */
     @Override
     public boolean isEmpty() {
-        if (startState == null) return true;
-
-        Set<State> visited = new HashSet<>(); // Пазим къде сме били
-        Deque<State> stack = new ArrayDeque<>(); // Модерен стек за DFS обхождане
-        stack.push(startState);
-
-        while (!stack.isEmpty()) {
-            State current = stack.pop();
-
-            // Проверяваме дали вече сме го посетили
-            if (visited.contains(current)) continue;
-            visited.add(current); // Отбелязваме го като посетено
-
-            // Ако намерим финално състояние, езикът не е празен
-            if (current.isAccepting()) return false;
-
-            // Добавяме всички съседи в стека
-            for (Transition t : transitionMap.getOrDefault(current, new ArrayList<>())) {
-                stack.push(t.getTo());
-            }
-        }
-        // Ако сме обиколили всичко и не сме намерили финално състояние -> празен е
-        return true;
+        return new EmptinessCheck().check(this);
     }
-    // Проверява дали езикът е краен (търси за цикли в графа)
-    // Проверява дали езикът е краен или безкраен.
-    // Езикът е безкраен, ако в автомата има ЦИКЪЛ, но не какъв да е цикъл,
-    // а такъв, от който можеш да стигнеш до финално състояние!
+
+    /**
+     * Проверява дали езикът на автомата е краен.
+     *
+     * <p>Делегира към класа {@link automata.core.analysis.FinitenessCheck}.</p>
+     *
+     * @return {@code true}, ако езикът е краен; {@code false}, ако е безкраен
+     */
     public boolean isFinite() {
-        if (startState == null) return true; // Ако няма старт, езикът е празен (следователно е краен)
-
-        // СТЪПКА 1: Намираме всички "достижими" състояния (до които можем да стигнем от старта)
-        Set<State> reachable = new HashSet<>();
-        Deque<State> queue = new ArrayDeque<>();
-        queue.add(startState);
-        while (!queue.isEmpty()) {
-            State s = queue.poll();
-            if (reachable.add(s)) { // Ако успешно го добавим (т.е. не сме го виждали)
-                // Добавяме всичките му съседи в опашката
-                for (Transition t : transitionMap.getOrDefault(s, new ArrayList<>())) queue.add(t.getTo());
-            }
-        }
-
-        // СТЪПКА 2: Намираме всички "ко-достижими" състояния (от които може да се стигне до ФИНАЛ)
-        // За целта обръщаме посоката на стрелките (преходите)
-        Map<State, List<State>> reverse = new HashMap<>();
-        for (State s : reachable) reverse.put(s, new ArrayList<>());
-        for (State s : reachable) {
-            for (Transition t : transitionMap.getOrDefault(s, new ArrayList<>())) {
-                if (reachable.contains(t.getTo())) reverse.get(t.getTo()).add(s); // Записваме ги наобратно
-            }
-        }
-
-        Set<State> coReachable = new HashSet<>();
-        // Започваме търсенето наобратно, стартирайки от всички финални състояния
-        for (State s : reachable) if (s.isAccepting()) queue.add(s);
-        while (!queue.isEmpty()) {
-            State s = queue.poll();
-            if (coReachable.add(s)) {
-                for (State pred : reverse.getOrDefault(s, new ArrayList<>())) queue.add(pred);
-            }
-        }
-
-        // СТЪПКА 3: Полезни състояния = хем са достижими от старта, хем стигат до финала
-        Set<State> useful = new HashSet<>(reachable);
-        useful.retainAll(coReachable); // Оставяме само тези, които се засичат в двете множества
-
-        // СТЪПКА 4: Търсим цикъл само сред ПОЛЕЗНИТЕ състояния (Топологично сортиране / Kahn's Algorithm)
-        Map<State, Integer> inDegree = new HashMap<>(); // Пази колко стрелки ВЛИЗАТ във всяко състояние
-        for (State s : useful) inDegree.put(s, 0);
-        for (State s : useful) {
-            for (Transition t : transitionMap.getOrDefault(s, new ArrayList<>())) {
-                if (useful.contains(t.getTo())) inDegree.merge(t.getTo(), 1, Integer::sum); // Увеличаваме брояча
-            }
-        }
-
-        Deque<State> topoQueue = new ArrayDeque<>();
-        // Почваме от тези, в които не влизат никакви стрелки
-        for (State s : useful) if (inDegree.get(s) == 0) topoQueue.add(s);
-
-        int processed = 0; // Броим колко състояния сме обработили
-        while (!topoQueue.isEmpty()) {
-            State s = topoQueue.poll();
-            processed++;
-            // "Изтриваме" изходящите стрелки на това състояние
-            for (Transition t : transitionMap.getOrDefault(s, new ArrayList<>())) {
-                if (useful.contains(t.getTo())) {
-                    // Ако след изтриването в следващото състояние вече не влизат стрелки - го добавяме в опашката
-                    if (inDegree.merge(t.getTo(), -1, Integer::sum) == 0) topoQueue.add(t.getTo());
-                }
-            }
-        }
-
-        // Ако сме успели да обработим всички полезни състояния, значи НЯМА цикли -> езикът е КРАЕН (true).
-        // Ако processed е по-малко, значи сме забили в цикъл -> езикът е БЕЗКРАЕН (false).
-        return processed == useful.size();
+        return new FinitenessCheck().check(this);
     }
 }
