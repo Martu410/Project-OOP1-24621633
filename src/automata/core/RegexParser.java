@@ -1,13 +1,40 @@
 package automata.core;
 
+import automata.core.operations.ConcatOperation;
+import automata.core.operations.KleeneOperation;
+import automata.core.operations.UnionOperation;
 import automata.model.State;
 import java.util.Stack;
 
-// Клас, отговарящ за парсването на регулярни изрази и превръщането им в крайни автомати
+/**
+ * Парсва регулярен израз и го преобразува в краен автомат.
+ *
+ * <p>Работи в три фази: (1) вмъкване на изрични оператори за конкатенация,
+ * (2) преобразуване от инфиксен в постфиксен запис чрез алгоритъма
+ * Shunting-yard на Дийкстра, и (3) сглобяване на автомата от постфиксния
+ * израз по конструкцията на Томпсън. За самите операции използва
+ * специализираните класове от пакета {@code automata.core.operations}.</p>
+ */
 public class RegexParser {
 
-    // Помощен метод, който вмъква изричен символ за конкатенация ('.') между съседни символи.
-    // Напр. превръща "ab" в "a.b", за да може парсерът лесно да разпознае операцията.
+    /** Операция звезда на Клини, прилагана при символ '*'. */
+    private static final KleeneOperation KLEENE = new KleeneOperation();
+
+    /** Операция конкатенация, прилагана при символ '.'. */
+    private static final ConcatOperation CONCAT = new ConcatOperation();
+
+    /** Операция обединение, прилагана при символ '|'. */
+    private static final UnionOperation UNION  = new UnionOperation();
+
+    /**
+     * Вмъква изричен символ за конкатенация ('.') между съседни операнди.
+     *
+     * <p>Например низът "ab" се преобразува в "a.b", за да може парсерът да
+     * разпознае имплицитната конкатенация като явна операция.</p>
+     *
+     * @param regex регулярният израз
+     * @return изразът с вмъкнати изрични оператори за конкатенация
+     */
     private static String insertExplicitConcat(String regex) {
         StringBuilder res = new StringBuilder(); // Използваме StringBuilder за по-ефективно конструиране на низа
 
@@ -32,7 +59,12 @@ public class RegexParser {
         return res.toString(); // Връщаме форматирания низ
     }
 
-    // Определя приоритета на математическите операции в регулярния израз
+    /**
+     * Връща приоритета на даден оператор в регулярния израз.
+     *
+     * @param c символът на оператора
+     * @return 3 за '*', 2 за '.', 1 за '|', 0 за всичко останало
+     */
     private static int precedence(char c) {
         switch (c) {
             case '*': return 3; // Най-висок приоритет: Звезда на Клини
@@ -42,7 +74,13 @@ public class RegexParser {
         }
     }
 
-    // Алгоритъм на Shunting-yard за преобразуване на инфиксен израз (напр. "a|b") в постфиксен (напр. "ab|")
+    /**
+     * Преобразува инфиксен регулярен израз в постфиксен (обратен полски запис)
+     * чрез алгоритъма Shunting-yard.
+     *
+     * @param regex инфиксният регулярен израз, например "a|b"
+     * @return еквивалентният постфиксен израз, например "ab|"
+     */
     private static String toPostfix(String regex) {
         String formattedRegEx = insertExplicitConcat(regex); // Първо добавяме скритите точки
         StringBuilder postfix = new StringBuilder(); // Тук ще трупаме крайния резултат
@@ -83,7 +121,13 @@ public class RegexParser {
         return postfix.toString(); // Връщаме израза в постфиксен формат (Обратен полски запис)
     }
 
-    // Главен метод, който чете регулярния израз и построява крайния автомат
+    /**
+     * Построява краен автомат от подаден регулярен израз.
+     *
+     * @param regex регулярният израз
+     * @param id    идентификаторът на новия автомат
+     * @return автомат, разпознаващ езика на регулярния израз
+     */
     public static Automaton createFromRegex(String regex, String id) {
         String postfix = toPostfix(regex); // Първо преобразуваме израза в удобен за машината постфиксен формат
         Stack<Automaton> stack = new Stack<>(); // Стек, в който ще държим временните автомати, докато ги сглобяваме
@@ -94,17 +138,17 @@ public class RegexParser {
             if (c == '*') {
                 // При Звезда изваждаме 1 автомат от стека и го завъртаме
                 Automaton a = stack.pop();
-                stack.push(AutomatonOperations.kleene(a, "temp" + (counter++)));
+                stack.push(KLEENE.apply(a, "temp" + (counter++)));
             } else if (c == '.') {
                 // При Конкатенация изваждаме 2 автомата и ги залепяме (първо вадим десния, после левия!)
                 Automaton a2 = stack.pop();
                 Automaton a1 = stack.pop();
-                stack.push(AutomatonOperations.concat(a1, a2, "temp" + (counter++)));
+                stack.push(CONCAT.apply(a1, a2, "temp" + (counter++)));
             } else if (c == '|') {
                 // При Обединение изваждаме 2 автомата и ги обединяваме успоредно
                 Automaton a2 = stack.pop();
                 Automaton a1 = stack.pop();
-                stack.push(AutomatonOperations.union(a1, a2, "temp" + (counter++)));
+                stack.push(UNION.apply(a1, a2, "temp" + (counter++)));
             } else {
                 // Базов случай: Ако е буква, създаваме мини-автомат само с 2 състояния (начално и крайно) и преход с тази буква
                 Automaton a = new Automaton("temp" + (counter++));

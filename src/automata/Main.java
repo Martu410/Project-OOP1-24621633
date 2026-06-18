@@ -2,15 +2,48 @@ package automata;
 
 import automata.core.Automaton;
 import automata.core.AutomatonException;
-import automata.core.AutomatonOperations;
 import automata.core.RegexParser;
+import automata.core.operations.ConcatOperation;
+import automata.core.operations.DeterminizeOperation;
+import automata.core.operations.KleeneOperation;
+import automata.core.operations.PositiveKleeneOperation;
+import automata.core.operations.UnionOperation;
 import automata.manager.AutomatonManager;
 import automata.manager.FileHandler; // ВАЖНО: Добавихме импорта за работа с файлове
 
 import java.util.Scanner;
 
+/**
+ * Входна точка на приложението за работа с крайни автомати.
+ *
+ * <p>Реализира интерактивен конзолен интерфейс (CLI), който чете команди от
+ * потребителя и ги изпълнява в цикъл. Всяка команда се обработва в блок
+ * {@code try-catch}, който прихваща {@link AutomatonException} и предотвратява
+ * прекъсване на програмата при грешка. Операциите над автомати се делегират
+ * на специализираните класове от пакета {@code automata.core.operations}.</p>
+ */
 public class Main {
 
+    /** Операция обединение на два автомата. */
+    private static final UnionOperation UNION = new UnionOperation();
+
+    /** Операция конкатенация на два автомата. */
+    private static final ConcatOperation CONCAT = new ConcatOperation();
+
+    /** Операция звезда на Клини. */
+    private static final KleeneOperation KLEENE = new KleeneOperation();
+
+    /** Операция позитивна обвивка (Kleene plus). */
+    private static final PositiveKleeneOperation POSITIVE = new PositiveKleeneOperation();
+
+    /** Операция детерминизация (НКА към ДКА). */
+    private static final DeterminizeOperation DETERMINIZE = new DeterminizeOperation();
+
+    /**
+     * Стартира интерактивния конзолен цикъл на приложението.
+     *
+     * @param args аргументи от командния ред (не се използват)
+     */
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
         AutomatonManager manager = new AutomatonManager(); // Създаваме си мениджъра за паметта
@@ -103,7 +136,7 @@ public class Main {
                         if (parts.length < 4) throw new AutomatonException("Формат: union <id1> <id2> <new_id>");
                         Automaton u1 = getRequired(manager, parts[1]);
                         Automaton u2 = getRequired(manager, parts[2]);
-                        manager.addAutomaton(AutomatonOperations.union(u1, u2, parts[3]));
+                        manager.addAutomaton(UNION.apply(u1, u2, parts[3]));
                         System.out.println("Обединен автомат: " + parts[3]);
                         break;
 
@@ -111,28 +144,28 @@ public class Main {
                         if (parts.length < 4) throw new AutomatonException("Формат: concat <id1> <id2> <new_id>");
                         Automaton c1 = getRequired(manager, parts[1]);
                         Automaton c2 = getRequired(manager, parts[2]);
-                        manager.addAutomaton(AutomatonOperations.concat(c1, c2, parts[3]));
+                        manager.addAutomaton(CONCAT.apply(c1, c2, parts[3]));
                         System.out.println("Конкатениран автомат: " + parts[3]);
                         break;
 
                     case "kleene":
                         if (parts.length < 3) throw new AutomatonException("Формат: kleene <id> <new_id>");
                         Automaton k1 = getRequired(manager, parts[1]);
-                        manager.addAutomaton(AutomatonOperations.kleene(k1, parts[2]));
+                        manager.addAutomaton(KLEENE.apply(k1, parts[2]));
                         System.out.println("Звезда на Клини приложена: " + parts[2]);
                         break;
 
                     case "un":
                         if (parts.length < 3) throw new AutomatonException("Формат: un <id> <new_id>");
                         Automaton un1 = getRequired(manager, parts[1]);
-                        manager.addAutomaton(AutomatonOperations.positiveKleene(un1, parts[2]));
+                        manager.addAutomaton(POSITIVE.apply(un1, parts[2]));
                         System.out.println("Позитивна обвивка (un) приложена: " + parts[2]);
                         break;
 
                     case "determinize":
                         if (parts.length < 3) throw new AutomatonException("Формат: determinize <id> <new_id>");
                         Automaton d1 = getRequired(manager, parts[1]);
-                        manager.addAutomaton(AutomatonOperations.determinize(d1, parts[2]));
+                        manager.addAutomaton(DETERMINIZE.apply(d1, parts[2]));
                         System.out.println("Автоматът е конвертиран в ДКА: " + parts[2]);
                         break;
 
@@ -164,6 +197,14 @@ public class Main {
         scanner.close();
     }
 
+    /**
+     * Връща автомат по идентификатор или хвърля изключение, ако той не съществува.
+     *
+     * @param manager мениджърът, в който се търси автоматът
+     * @param id      идентификаторът на търсения автомат
+     * @return намереният автомат
+     * @throws AutomatonException ако автомат с този идентификатор не съществува
+     */
     private static Automaton getRequired(AutomatonManager manager, String id) throws AutomatonException {
         Automaton a = manager.getAutomaton(id);
         if (a == null) {
