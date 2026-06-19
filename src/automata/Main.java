@@ -92,6 +92,7 @@ public class Main {
                         System.out.println("  determinize <id> <new>   - Превръща НКА в ДКА");
                         System.out.println("  open <filename>          - Зарежда автомати от файл");
                         System.out.println("  save                     - Записва в текущо отворения файл");
+                        System.out.println("  save <id> <filename>     - Записва един автомат във файл");
                         System.out.println("  save as <filename>       - Записва в нов файл по избор");
                         System.out.println("  close                    - Затваря файла без запис");
                         System.out.println("  exit                     - Изход от програмата");
@@ -183,10 +184,17 @@ public class Main {
                         break;
 
                     case "save":
-                        // Без аргумент: записва обратно в текущо отворения файл
-                        if (!manager.isFileOpen())
-                            throw new AutomatonException("Няма отворен файл. Първо използвайте 'open <filename>'.");
-                        FileHandler.save(manager, manager.getCurrentFile());
+                        // Две форми:
+                        //   save                  -> записва всички в текущо отворения файл
+                        //   save <id> <filename>  -> записва един автомат (по id) в посочен файл
+                        if (parts.length >= 3) {
+                            Automaton toSave = getRequired(manager, parts[1]);
+                            FileHandler.saveSingle(toSave, parts[2]);
+                        } else {
+                            if (!manager.isFileOpen())
+                                throw new AutomatonException("Няма отворен файл. Първо използвайте 'open <filename>'.");
+                            FileHandler.save(manager, manager.getCurrentFile());
+                        }
                         break;
 
                     case "saveas":

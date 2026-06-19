@@ -28,38 +28,7 @@ public class FileHandler {
         try (PrintWriter writer = new PrintWriter(new FileWriter(filename))) {
             // Взимаме речника с всички автомати и обхождаме само стойностите (самите обекти Automaton)
             for (Automaton a : manager.getAllAutomata().values()) {
-                // Записваме ID-то на автомата на първия ред
-                writer.println("ID:" + a.getId());
-
-                // Започваме реда със списъка от състояния
-                writer.print("STATES:");
-                // Обхождаме всяко състояние в текущия автомат
-                for (State s : a.getStates()) {
-                    // Записваме името му и добавяме (1) ако е финално или (0) ако не е, следвано от запетая
-                    writer.print(s.getName() + (s.isAccepting() ? "(1)" : "(0)") + ",");
-                }
-                writer.println(); // Преминаваме на нов ред във файла
-
-                // Проверяваме дали автоматът има зададено начално състояние
-                if (a.getStartState() != null) {
-                    // Ако има, записваме името му
-                    writer.println("START:" + a.getStartState().getName());
-                } else {
-                    // Ако няма, изрично записваме null
-                    writer.println("START:null");
-                }
-
-                // Започваме реда с преходите
-                writer.print("TRANSITIONS:");
-                // Обхождаме всеки преход в текущия автомат
-                for (Transition t : a.getTransitions()) {
-                    // Записваме прехода във формат "от,символ,към;"
-                    writer.print(t.getFrom().getName() + "," + t.getSymbol() + "," + t.getTo().getName() + ";");
-                }
-                writer.println(); // Преминаваме на нов ред
-
-                // Записваме разделител "---", за да знаем къде свършва този автомат и започва следващият
-                writer.println("---");
+                writeAutomaton(writer, a); // Записваме всеки автомат чрез общия помощен метод
             }
             // Извеждаме съобщение за успех в конзолата
             System.out.println("Автоматите са успешно запазени във файл: " + filename);
@@ -67,6 +36,69 @@ public class FileHandler {
             // При грешка с файловата система (напр. няма права за писане), прихващаме изключението
             System.out.println("Грешка при запазване: " + e.getMessage());
         }
+    }
+
+    /**
+     * Записва един-единствен автомат (по идентификатор) в посочен файл.
+     *
+     * <p>Реализира командата {@code save <id> <filename>} от заданието —
+     * за разлика от {@link #save(AutomatonManager, String)}, която записва
+     * всички заредени автомати.</p>
+     *
+     * @param automaton автоматът, който да бъде записан
+     * @param filename  пътят до файла, в който да се запише
+     */
+    public static void saveSingle(Automaton automaton, String filename) {
+        try (PrintWriter writer = new PrintWriter(new FileWriter(filename))) {
+            writeAutomaton(writer, automaton); // Записваме само този автомат
+            System.out.println("Автоматът '" + automaton.getId() + "' е записан във файл: " + filename);
+        } catch (IOException e) {
+            System.out.println("Грешка при запазване: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Записва един автомат в подадения поток по разработения текстов формат.
+     *
+     * <p>Общ помощен метод, използван и от {@link #save(AutomatonManager, String)},
+     * и от {@link #saveSingle(Automaton, String)}, за да не се дублира логиката.</p>
+     *
+     * @param writer    потокът за запис
+     * @param a         автоматът, който се записва
+     */
+    private static void writeAutomaton(PrintWriter writer, Automaton a) {
+        // Записваме ID-то на автомата на първия ред
+        writer.println("ID:" + a.getId());
+
+        // Започваме реда със списъка от състояния
+        writer.print("STATES:");
+        // Обхождаме всяко състояние в текущия автомат
+        for (State s : a.getStates()) {
+            // Записваме името му и добавяме (1) ако е финално или (0) ако не е, следвано от запетая
+            writer.print(s.getName() + (s.isAccepting() ? "(1)" : "(0)") + ",");
+        }
+        writer.println(); // Преминаваме на нов ред във файла
+
+        // Проверяваме дали автоматът има зададено начално състояние
+        if (a.getStartState() != null) {
+            // Ако има, записваме името му
+            writer.println("START:" + a.getStartState().getName());
+        } else {
+            // Ако няма, изрично записваме null
+            writer.println("START:null");
+        }
+
+        // Започваме реда с преходите
+        writer.print("TRANSITIONS:");
+        // Обхождаме всеки преход в текущия автомат
+        for (Transition t : a.getTransitions()) {
+            // Записваме прехода във формат "от,символ,към;"
+            writer.print(t.getFrom().getName() + "," + t.getSymbol() + "," + t.getTo().getName() + ";");
+        }
+        writer.println(); // Преминаваме на нов ред
+
+        // Записваме разделител "---", за да знаем къде свършва този автомат и започва следващият
+        writer.println("---");
     }
 
     /**
