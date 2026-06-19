@@ -25,19 +25,19 @@ import java.util.Scanner;
 public class Main {
 
     /** Операция обединение на два автомата. */
-    private static final UnionOperation UNION = new UnionOperation();
+    private static final UnionOperation          UNION       = new UnionOperation();
 
     /** Операция конкатенация на два автомата. */
-    private static final ConcatOperation CONCAT = new ConcatOperation();
+    private static final ConcatOperation         CONCAT      = new ConcatOperation();
 
     /** Операция звезда на Клини. */
-    private static final KleeneOperation KLEENE = new KleeneOperation();
+    private static final KleeneOperation         KLEENE      = new KleeneOperation();
 
     /** Операция позитивна обвивка (Kleene plus). */
-    private static final PositiveKleeneOperation POSITIVE = new PositiveKleeneOperation();
+    private static final PositiveKleeneOperation POSITIVE    = new PositiveKleeneOperation();
 
     /** Операция детерминизация (НКА към ДКА). */
-    private static final DeterminizeOperation DETERMINIZE = new DeterminizeOperation();
+    private static final DeterminizeOperation    DETERMINIZE = new DeterminizeOperation();
 
     /**
      * Стартира интерактивния конзолен цикъл на приложението.
@@ -62,6 +62,17 @@ public class Main {
             String[] parts = input.split("\\s+");
             String command = parts[0].toLowerCase();
 
+            // Специален случай: "save as <file>" е съставна команда от две думи.
+            // Превръщаме я в "saveas" с пътя като първи аргумент, за да я обработим лесно.
+            if (command.equals("save") && parts.length >= 2 && parts[1].equalsIgnoreCase("as")) {
+                command = "saveas";
+                if (parts.length >= 3) {
+                    parts = new String[] { "saveas", parts[2] };
+                } else {
+                    parts = new String[] { "saveas" };
+                }
+            }
+
             // Слагаме всичко в try-catch, за да хващаме грешките (напр. ако търсим липсващ автомат)
             try {
                 switch (command) {
@@ -79,8 +90,10 @@ public class Main {
                         System.out.println("  kleene <id> <new>        - Звезда на Клини (повторение)");
                         System.out.println("  un <id> <new>            - Позитивна обвивка (Kleene Plus)");
                         System.out.println("  determinize <id> <new>   - Превръща НКА в ДКА");
-                        System.out.println("  save <filename>          - Запазва автоматите във файл");
                         System.out.println("  open <filename>          - Зарежда автомати от файл");
+                        System.out.println("  save                     - Записва в текущо отворения файл");
+                        System.out.println("  save as <filename>       - Записва в нов файл по избор");
+                        System.out.println("  close                    - Затваря файла без запис");
                         System.out.println("  exit                     - Изход от програмата");
                         break;
 
@@ -170,13 +183,31 @@ public class Main {
                         break;
 
                     case "save":
-                        if (parts.length < 2) throw new AutomatonException("Формат: save <filename>");
+                        // Без аргумент: записва обратно в текущо отворения файл
+                        if (!manager.isFileOpen())
+                            throw new AutomatonException("Няма отворен файл. Първо използвайте 'open <filename>'.");
+                        FileHandler.save(manager, manager.getCurrentFile());
+                        break;
+
+                    case "saveas":
+                        // save as <filename>: записва в нов файл и го прави текущ
+                        if (parts.length < 2) throw new AutomatonException("Формат: save as <filename>");
                         FileHandler.save(manager, parts[1]);
+                        manager.setCurrentFile(parts[1]);
                         break;
 
                     case "open":
                         if (parts.length < 2) throw new AutomatonException("Формат: open <filename>");
                         FileHandler.open(manager, parts[1]);
+                        manager.setCurrentFile(parts[1]); // Запомняме кой файл е отворен
+                        break;
+
+                    case "close":
+                        // Затваря текущия файл и изчиства заредените данни (без запис)
+                        if (!manager.isFileOpen())
+                            throw new AutomatonException("Няма отворен файл за затваряне.");
+                        System.out.println("Файлът " + manager.getCurrentFile() + " е затворен (без запис).");
+                        manager.clear();
                         break;
 
                     case "exit":
