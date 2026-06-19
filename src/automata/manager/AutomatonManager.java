@@ -21,10 +21,18 @@ public class AutomatonManager {
     private final Map<String, Automaton> automata;
 
     /**
+     * Пътят до текущо отворения файл (или {@code null}, ако няма отворен файл).
+     * Използва се от командата {@code save} (без аргумент), за да запише
+     * обратно в същия файл, от който са били прочетени данните.
+     */
+    private String currentFile;
+
+    /**
      * Създава празен мениджър без заредени автомати.
      */
     public AutomatonManager() {
         this.automata = new HashMap<>();
+        this.currentFile = null;
     }
 
     /**
@@ -73,9 +81,37 @@ public class AutomatonManager {
     }
 
     /**
-     * Изчиства всички автомати от паметта.
+     * Връща пътя до текущо отворения файл.
+     *
+     * @return пътят до файла или {@code null}, ако няма отворен файл
+     */
+    public String getCurrentFile() {
+        return currentFile;
+    }
+
+    /**
+     * Задава пътя до текущо отворения файл.
+     *
+     * @param currentFile пътят до файла (или {@code null}, за да се отбележи, че няма отворен файл)
+     */
+    public void setCurrentFile(String currentFile) {
+        this.currentFile = currentFile;
+    }
+
+    /**
+     * Проверява дали в момента има отворен файл.
+     *
+     * @return {@code true}, ако има отворен файл
+     */
+    public boolean isFileOpen() {
+        return currentFile != null;
+    }
+
+    /**
+     * Изчиства всички автомати от паметта и затваря текущия файл.
      */
     public void clear() {
         automata.clear();
+        currentFile = null;
     }
 }
