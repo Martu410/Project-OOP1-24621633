@@ -1,8 +1,5 @@
 package automata.core;
 
-import automata.core.analysis.DeterminismCheck;
-import automata.core.analysis.EmptinessCheck;
-import automata.core.analysis.FinitenessCheck;
 import automata.model.State;
 import automata.model.Transition;
 
@@ -224,6 +221,34 @@ public class Automaton implements Recognizable {
     }
 
     /**
+     * Връща множеството от всички състояния, достижими от началното състояние.
+     *
+     * <p>Обхожда графа на автомата в дълбочина (DFS), започвайки от стартовото
+     * състояние и следвайки преходите. Методът е общ за класовете за анализ
+     * (например проверките за празнота и крайност), които иначе биха повтаряли
+     * една и съща логика за обхождане.</p>
+     *
+     * @return множеството от достижими състояния (празно, ако няма старт)
+     */
+    public Set<State> getReachableStates() {
+        Set<State> reachable = new HashSet<>();
+        if (startState == null) {
+            return reachable;
+        }
+        List<State> stack = new ArrayList<>(); // Списък, който ползваме като стек за DFS
+        stack.add(startState);
+        while (!stack.isEmpty()) {
+            State current = stack.remove(stack.size() - 1); // Вадим върха на стека
+            if (reachable.add(current)) { // Ако е ново (не сме го виждали), добавяме съседите
+                for (Transition t : getTransitionsFrom(current)) {
+                    stack.add(t.getTo());
+                }
+            }
+        }
+        return reachable;
+    }
+
+    /**
      * Отпечатва на конзолата подробна информация за всички преходи на автомата.
      */
     public void printInfo() {
@@ -243,7 +268,7 @@ public class Automaton implements Recognizable {
      * @return {@code true}, ако автоматът е детерминиран
      */
     public boolean isDeterministic() {
-        return new DeterminismCheck().check(this);
+        return new automata.core.analysis.DeterminismCheck().check(this);
     }
 
     /**
@@ -255,7 +280,7 @@ public class Automaton implements Recognizable {
      */
     @Override
     public boolean isEmpty() {
-        return new EmptinessCheck().check(this);
+        return new automata.core.analysis.EmptinessCheck().check(this);
     }
 
     /**
@@ -266,6 +291,6 @@ public class Automaton implements Recognizable {
      * @return {@code true}, ако езикът е краен; {@code false}, ако е безкраен
      */
     public boolean isFinite() {
-        return new FinitenessCheck().check(this);
+        return new automata.core.analysis.FinitenessCheck().check(this);
     }
 }

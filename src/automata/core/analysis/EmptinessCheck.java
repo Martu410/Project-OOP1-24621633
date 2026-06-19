@@ -2,20 +2,16 @@ package automata.core.analysis;
 
 import automata.core.Automaton;
 import automata.model.State;
-import automata.model.Transition;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 
 /**
  * Проверява дали езикът на даден автомат е празен.
  *
  * <p>Езикът е празен, ако от началното състояние не е достижимо нито едно
- * финално състояние. Реализацията използва обхождане в дълбочина (DFS) със
- * списък като стек, като проверката за вече посетено състояние се прави в
- * началото на всяка итерация — това гарантира коректна работа при цикли.</p>
+ * финално състояние. Класът използва {@link Automaton#getReachableStates()}
+ * за обхождането и след това проверява дали сред достижимите има финално
+ * състояние.</p>
  */
 public class EmptinessCheck {
 
@@ -26,29 +22,16 @@ public class EmptinessCheck {
      * @return {@code true}, ако автоматът не приема нито една дума
      */
     public boolean check(Automaton automaton) {
-        State startState = automaton.getStartState();
-        if (startState == null) return true;
+        // Взимаме всички достижими от старта състояния (общо обхождане в Automaton)
+        Set<State> reachable = automaton.getReachableStates();
 
-        Set<State> visited = new HashSet<>(); // Пазим къде сме били
-        List<State> stack = new ArrayList<>(); // Списък, който ползваме като стек за DFS
-        stack.add(startState);
-
-        while (!stack.isEmpty()) {
-            State current = stack.remove(stack.size() - 1); // Вадим върха на стека
-
-            // Проверяваме дали вече сме го посетили
-            if (visited.contains(current)) continue;
-            visited.add(current); // Отбелязваме го като посетено
-
-            // Ако намерим финално състояние, езикът не е празен
-            if (current.isAccepting()) return false;
-
-            // Добавяме всички съседи в стека
-            for (Transition t : automaton.getTransitionsFrom(current)) {
-                stack.add(t.getTo());
+        // Ако някое достижимо състояние е финално -> езикът НЕ е празен
+        for (State s : reachable) {
+            if (s.isAccepting()) {
+                return false;
             }
         }
-        // Обиколили сме всичко без финално състояние -> езикът е празен
+        // Няма достижимо финално състояние -> езикът е празен
         return true;
     }
 }

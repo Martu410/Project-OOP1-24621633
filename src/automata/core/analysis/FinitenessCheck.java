@@ -35,16 +35,9 @@ public class FinitenessCheck {
         State startState = automaton.getStartState();
         if (startState == null) return true; // Няма старт -> езикът е празен (следователно краен)
 
-        // СТЪПКА 1: Намираме всички "достижими" състояния (до които стигаме от старта)
-        Set<State> reachable = new HashSet<>();
-        List<State> queue = new ArrayList<>(); // Списък, който ползваме като опашка
-        queue.add(startState);
-        while (!queue.isEmpty()) {
-            State s = queue.remove(0); // Вадим първия елемент (началото на опашката)
-            if (reachable.add(s)) { // Ако успешно го добавим (т.е. не сме го виждали)
-                for (Transition t : automaton.getTransitionsFrom(s)) queue.add(t.getTo());
-            }
-        }
+        // СТЪПКА 1: Намираме всички "достижими" състояния (общо обхождане в Automaton)
+        Set<State> reachable = automaton.getReachableStates();
+        List<State> queue = new ArrayList<>(); // Списък, който ползваме като опашка по-долу
 
         // СТЪПКА 2: Намираме "ко-достижимите" (от които може да се стигне до ФИНАЛ)
         // За целта обръщаме посоката на преходите
